@@ -8,24 +8,28 @@ import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 
 fun loadContributorsCallbacks(service: GitHubService, req: RequestData, updateResults: (List<User>) -> Unit) {
-    service.getOrgReposCall(req.org).onResponse { responseRepos ->
+    val allUsers = mutableListOf<User>()
+    val call = service.getOrgReposCall(req.org)
+    call.onResponse { responseRepos ->
         logRepos(req, responseRepos)
         val repos = responseRepos.bodyList()
-        val allUsers = mutableListOf<User>()
-        for (repo in repos) {
-            service.getRepoContributorsCall(req.org, repo.name).onResponse { responseUsers ->
+        val atomicInteger = AtomicInteger()
+        for ((i, repo) in repos.withIndex()) {
+            val repoCall = service.getRepoContributorsCall(req.org, repo.name)
+            repoCall.onResponse { responseUsers ->
                 logUsers(repo, responseUsers)
                 val users = responseUsers.bodyList()
                 allUsers += users
+                if (atomicInteger.incrementAndGet() == repos.size) {
+                    updateResults(allUsers.aggregate())
+                }
             }
         }
-        // TODO: Why this code doesn't work? How to fix that?
-        updateResults(allUsers.aggregate())
     }
 }
 
 inline fun <T> Call<T>.onResponse(crossinline callback: (Response<T>) -> Unit) {
-    enqueue(object : Callback<T> {
+    return enqueue(object : Callback<T> {
         override fun onResponse(call: Call<T>, response: Response<T>) {
             callback(response)
         }
