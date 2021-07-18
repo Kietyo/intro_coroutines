@@ -17,14 +17,12 @@ suspend fun loadContributorsProgress(
 
     var allUsers = emptyList<User>()
 
-    repos.forEach { repo ->
+    for ((i, repo) in repos.withIndex()) {
         val users = service
             .getRepoContributors(req.org, repo.name)
             .also { logUsers(repo, it) }
             .bodyList()
-        allUsers = (allUsers + users)
-        updateResults(allUsers.aggregate(), false)
+        allUsers = (allUsers + users).aggregate()
+        updateResults(allUsers, i == repos.size - 1)
     }
-
-    updateResults(allUsers.aggregate(), true)
 }
